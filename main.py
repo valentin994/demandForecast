@@ -3,6 +3,7 @@ import numpy as np
 import seaborn as sns
 from matplotlib import pyplot as plt
 from sklearn import svm
+from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression as LinReg
 from sklearn.model_selection import GridSearchCV
@@ -12,6 +13,7 @@ from sklearn.metrics import r2_score, mean_squared_error, \
     explained_variance_score, max_error
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.preprocessing import StandardScaler
+import time
 
 PATH = './train.csv'
 
@@ -135,7 +137,7 @@ if __name__ == '__main__':
     df['date'] = pd.to_datetime(df['date'])
     temp = df
     daily_sale = df.groupby('date')['sales'].sum().to_frame()
-    for itemNumber in range(4, 51):
+    for itemNumber in range(1, 51):
         df = temp[temp['item'] == itemNumber]
         df = df.groupby('date')['sales'].sum().to_frame().reset_index()
         df['year'] = df.date.dt.year
@@ -182,11 +184,19 @@ if __name__ == '__main__':
         X = df.drop('sales', axis=1)
         y = df['sales']
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-        svr = svm.SVR(C=0.001, kernel='linear', degree=8, gamma='scale', coef0=10)
-        svr.fit(X_train, y_train)
-        predictions = svr.predict(X_test)
 
-        predictions = svr.predict(test.drop('sales', axis=1))
+        #   SVR MODEL
+        #svr = svm.SVR(C=0.001, kernel='linear', degree=8, gamma='scale', coef0=10, verbose=3)
+        #svr.fit(X_train, y_train)
+        #predictions = svr.predict(X_test)
+        #predictions = svr.predict(test.drop('sales', axis=1))
+
+        #   LINEAR REGRESSION
+
+        lin_reg = LinearRegression()
+        lin_reg.fit(X_train, y_train)
+        predictions = lin_reg.predict(test.drop('sales', axis=1))
+
         y_test = test['sales'].tolist()
 
         results = pd.DataFrame()
@@ -196,7 +206,7 @@ if __name__ == '__main__':
         results['dayofweek'] = test['dayofweek'].tolist()
         results['month'] = test['month'].tolist()
         print(test.info())
-        results.to_csv(f'./rjesenja/results_{itemNumber}.csv', index=False)
+        results.to_csv(f'./rjesenja_linear/results_{itemNumber}.csv', index=False)
         #scaler = StandardScaler()
         #scaler.fit(df.drop('sales', axis=1))
         #scaled_features = scaler.transform(df.drop('sales', axis=1))
