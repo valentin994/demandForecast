@@ -30,12 +30,12 @@ def plot_metric_vs_time(df, metric):
 
 if __name__ == '__main__':
 
-    #r2 = []
-    #mse = []
-    #evs = []
-    #mae = []
-    #mad = []
-    #me = []
+        #r2 = []
+        #mse = []
+        #evs = []
+        #mae = []
+        #mad = []
+        #me = []
 #
     #for itemNumber in range(1, 51):
     #    df = pd.read_csv(f'./rjesenja_linear/results_{itemNumber}.csv')

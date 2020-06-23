@@ -137,7 +137,10 @@ if __name__ == '__main__':
     df['date'] = pd.to_datetime(df['date'])
     temp = df
     daily_sale = df.groupby('date')['sales'].sum().to_frame()
-    for itemNumber in range(1, 51):
+    mean_sales = df.groupby('date')['sales'].mean().to_frame()
+
+
+    for itemNumber in range(14, 15):
         df = temp[temp['item'] == itemNumber]
         df = df.groupby('date')['sales'].sum().to_frame().reset_index()
         df['year'] = df.date.dt.year
@@ -152,11 +155,16 @@ if __name__ == '__main__':
             df[f'shift_sales+{i}'] = df['sales'].shift(i)
 
         df['daily_store_sales'] = daily_sale['sales'].tolist()
-        for i in range(1, 15):
+        for i in range(1, 31):
             df[f'daily_store_sales{i}'] = df['daily_store_sales'].shift(i)
         df = df.drop('daily_store_sales', axis=1)
 
-        for i in range(1, 15):
+        df['mean_store_sales'] = mean_sales['sales'].tolist()
+        for i in range(1, 31):
+            df[f'mean_store_sales{i}'] = df['mean_store_sales'].shift(i)
+        df = df.drop('mean_store_sales', axis=1)
+
+        for i in range(1, 31):
             df[f'shift_day+{i}'] = df['dayofweek'].shift(i)
 
         #df['week_sale'] = week_sale(df['sales'].tolist())
@@ -174,10 +182,10 @@ if __name__ == '__main__':
         #    df[f'monthly_sales{i}'] = df['monthly_sales'].shift(i)
         test = df[df['year'] > 2016]
         df = df[(df['year'] < 2017)]
-        df = df.iloc[15:]
+        df = df.iloc[30:]
         df = df.drop('year', axis=1)
         test = test.drop('year', axis=1)
-
+        print(df.columns)
 
         #   Model
 
@@ -186,18 +194,18 @@ if __name__ == '__main__':
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
         #   SVR MODEL
-        #svr = svm.SVR(C=0.001, kernel='linear', degree=8, gamma='scale', coef0=10, verbose=3)
-        #svr.fit(X_train, y_train)
-        #predictions = svr.predict(X_test)
-        #predictions = svr.predict(test.drop('sales', axis=1))
+        svr = svm.SVR(C=0.001, kernel='linear', degree=8, gamma='scale', coef0=10, verbose=3)
+        svr.fit(X_train, y_train)
+        predictions = svr.predict(X_test)
+        predictions = svr.predict(test.drop('sales', axis=1))
+        y_test = test['sales'].tolist()
 
         #   LINEAR REGRESSION
 
-        lin_reg = LinearRegression()
-        lin_reg.fit(X_train, y_train)
-        predictions = lin_reg.predict(test.drop('sales', axis=1))
-
-        y_test = test['sales'].tolist()
+        #lin_reg = LinearRegression()
+        #lin_reg.fit(X_train, y_train)
+        #predictions = lin_reg.predict(test.drop('sales', axis=1))
+        #y_test = test['sales'].tolist()
 
         results = pd.DataFrame()
         results['Predicted Values'] = predictions
@@ -205,21 +213,10 @@ if __name__ == '__main__':
         results['dayofmonth'] = test['dayofmonth'].tolist()
         results['dayofweek'] = test['dayofweek'].tolist()
         results['month'] = test['month'].tolist()
-        print(test.info())
-        results.to_csv(f'./rjesenja_linear/results_{itemNumber}.csv', index=False)
-        #scaler = StandardScaler()
-        #scaler.fit(df.drop('sales', axis=1))
-        #scaled_features = scaler.transform(df.drop('sales', axis=1))
-        #df_feat = pd.DataFrame(scaled_features, columns=df.columns[1:])
-        #X_train, X_test, y_train, y_test = train_test_split(df_feat, df['sales'], test_size=0.2, random_state=42)
-        #svr = svm.SVR(C=1000, kernel='linear', degree=8, gamma='scale', coef0=10)
-        #svr.fit(X_train, y_train)
-        #predictions = svr.predict(X_test)
-        # scaled_test = scaler.transform(test.drop('sales', axis=1))
-        #scaled_test_features = pd.DataFrame(scaled_test, columns=df.columns[1:])
-        #print(scaled_test_features)
-        #predictions = svr.predict(scaled_feat)
-        #y_test = test['sales']
+
+        #results.to_csv(f'./rjesenja_linear/results_{itemNumber}.csv', index=False)
+
+
         #   Evaluation
 
         print(f'Model fit results:\n'

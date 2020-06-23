@@ -3,117 +3,97 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense
 import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.metrics import r2_score, mean_squared_error, \
+    mean_absolute_error, median_absolute_error, \
+    explained_variance_score, max_error
 
 PATH = '../train.csv'
-TRAIN_SPLIT = 1461
 
-
-def univariate_data(dataset, start_index, end_index, history_size, target_size):
-    data = []
-    labels = []
-
-    start_index = start_index + history_size
-    if end_index is None:
-        end_index = len(dataset) - target_size
-
-    for i in range(start_index, end_index):
-        indices = range(i - history_size, i)
-        # Reshape data from (history_size,) to (history_size, 1)
-        data.append(np.reshape(dataset[indices], (history_size, 1)))
-        labels.append(dataset[i + target_size])
-    print(len(labels))
-    return np.array(data), np.array(labels)
-
-
-def create_time_steps(length):
-    return list(range(-length, 0))
-
-def show_plot(plot_data, delta, title):
-  labels = ['History', 'True Future', 'Model Prediction']
-  marker = ['.-', 'rx', 'go']
-  time_steps = create_time_steps(plot_data[0].shape[0])
-  if delta:
-    future = delta
-  else:
-    future = 0
-
-  plt.title(title)
-  for i, x in enumerate(plot_data):
-    if i:
-      plt.plot(future, plot_data[i], marker[i], markersize=10,
-               label=labels[i])
-    else:
-      plt.plot(time_steps, plot_data[i].flatten(), marker[i], label=labels[i])
-  plt.legend()
-  plt.xlim([time_steps[0], (future+5)*2])
-  plt.xlabel('Time-Step')
-  plt.savefig(f'{title}.png')
-  plt.clf()
-  return plt
-
-def baseline(history):
-  return np.mean(history)
 
 if __name__ == '__main__':
-    df = pd.read_csv(PATH)
-    df = df[(df['item'] == 1)]
-    df = df.groupby('date')['sales'].sum().to_frame().reset_index()
+    data = pd.read_csv(PATH)
+    daily_sale = data.groupby('date')['sales'].sum().to_frame()
+    for item in range(1, 51):
+        df = data[(data['item'] == item)]
+        df = df.groupby('date')['sales'].sum().to_frame().reset_index()
+        df['daily_store_sales'] = daily_sale['sales'].tolist()
+        df['date'] = pd.to_datetime(df['date'])
+        df['year'] = df.date.dt.year
 
-    # df['date'] = pd.Timestamp(df['date'])
+        df['dayofmonth'] = df.date.dt.day
+        df['dayofweek'] = df.date.dt.dayofweek
+        df['month'] = df.date.dt.month
 
-    uni_data = df['sales']
-    uni_data.index = df['date']
-    uni_data = uni_data.values
-    uni_train_mean = uni_data[:TRAIN_SPLIT].mean()
-    uni_train_std = uni_data[:TRAIN_SPLIT].std()
+        mean_sales = df.groupby('date')['sales'].mean().to_frame()
+        labels = []
+        labels.append('dayofmonth')
+        labels.append('dayofweek')
+        labels.append('month')
 
-    uni_data = (uni_data - uni_train_mean) / uni_train_std
-    univariate_past_history = 20
-    univariate_future_target = 0
+        for i in range(1, 15):
+            df[f'shift_sales+{i}'] = df['sales'].shift(i)
+            labels.append(f'shift_sales+{i}')
 
-    x_train_uni, y_train_uni = univariate_data(uni_data, 0, TRAIN_SPLIT,
-                                               univariate_past_history,
-                                               univariate_future_target)
+        df['daily_store_sales'] = daily_sale['sales'].tolist()
+        for i in range(1, 15):
+            df[f'daily_store_sales{i}'] = df['daily_store_sales'].shift(i)
+            labels.append(f'daily_store_sales{i}')
+        df = df.drop('daily_store_sales', axis=1)
 
-    x_val_uni, y_val_uni = univariate_data(uni_data, TRAIN_SPLIT, None,
-                                           univariate_past_history,
-                                           univariate_future_target)
+        df['mean_store_sales'] = mean_sales['sales'].tolist()
+        for i in range(1, 15):
+            df[f'mean_store_sales{i}'] = df['mean_store_sales'].shift(i)
+            labels.append(f'mean_store_sales{i}')
+        df = df.drop('mean_store_sales', axis=1)
 
-    show_plot([x_train_uni[0], y_train_uni[0]], 0, 'Sample Example')
-    show_plot([x_train_uni[0], y_train_uni[0], baseline(x_train_uni[0])], 0,
-              'Baseline Prediction Example')
+        for i in range(1, 15):
+            df[f'shift_day+{i}'] = df['dayofweek'].shift(i)
+            labels.append(f'shift_day+{i}')
+        print(len(labels))
+        df = df[15:]
+        temp = df[df['year'] == 2017]
+        df = df[df['year'] < 2017]
+        X = df[labels].values
+        y = df['sales'].values
+        eval_X = temp[labels].values
+        eval_y = temp['sales'].values
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-    BATCH_SIZE = 256
-    BUFFER_SIZE = 10000
+        scaler = MinMaxScaler()
+        scaler.fit(X_train)
+        X_train = scaler.transform(X_train)
+        X_test = scaler.transform(X_test)
+        eval_X = scaler.transform(eval_X)
 
-    train_univariate = tf.data.Dataset.from_tensor_slices((x_train_uni, y_train_uni))
-    train_univariate = train_univariate.cache().shuffle(BUFFER_SIZE).batch(BATCH_SIZE).repeat()
+        print(X_train.shape)
+        model = Sequential()
+        model.add(Dense(1156, 'relu'))
+        model.add(Dense(500, 'relu'))
+        model.add(Dense(250, 'relu'))
+        model.add(Dense(125, 'relu'))
+        model.add(Dense(1))
+        model.compile(optimizer='adam', loss='mse')
 
-    val_univariate = tf.data.Dataset.from_tensor_slices((x_val_uni, y_val_uni))
-    val_univariate = val_univariate.batch(BATCH_SIZE).repeat()
+        model.fit(x=X_train, y=y_train, epochs=10)
 
-    simple_lstm_model = tf.keras.models.Sequential([
-        tf.keras.layers.LSTM(8, input_shape=x_train_uni.shape[-2:]),
-        tf.keras.layers.Dense(1)
-    ])
+        loss_df = pd.DataFrame(model.history.history)
+        loss_df.plot()
+        plt.show()
+        test_predictions = model.predict(eval_X)
 
-    simple_lstm_model.compile(optimizer='adam', loss='mae')
 
-    #for x, y in val_univariate.take(1):
-    #    print(simple_lstm_model.predict(x).shape)
+        print(f'Model fit results:\n'
+              f'r2_score {r2_score(eval_y, test_predictions)} \t MSE {mean_squared_error(eval_y, test_predictions)}'
+              f'\tEVS {explained_variance_score(eval_y, test_predictions)} \n MAE {mean_absolute_error(eval_y, test_predictions)}'
+              f'\tMAD {median_absolute_error(eval_y, test_predictions)}\t ME {max_error(eval_y, test_predictions)}')
 
-    EPOCHS = 10
-    EVALUATION_INTERVAL = 200
-
-    simple_lstm_model.fit(train_univariate, epochs=EPOCHS,
-                          steps_per_epoch=EVALUATION_INTERVAL,
-                          validation_data=val_univariate, validation_steps=50)
-
-    i = 0
-    for x, y in val_univariate.take(3):
-        plot = show_plot([x[0].numpy(), y[0].numpy(),
-                          simple_lstm_model.predict(x)[0]], 0, f'Simple LSTM model{i}')
-        i += 1
-        plot.show()
-
+        test_results = pd.DataFrame(eval_y, columns=['True Sales'])
+        test_results['Predicted Sales'] = test_predictions
+        test_results['dayofweek'] = temp['dayofweek'].values
+        test_results['month'] = temp['month'].values
+        test_results.to_csv(f'./test_results/test_item_{item}_results.csv')

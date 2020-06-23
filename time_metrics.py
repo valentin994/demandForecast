@@ -87,7 +87,3 @@ if __name__ == '__main__':
     results['mae'] = mae
     print(results)
     results.to_csv('./plots_linear/time_metrics/mse_mae_time_metrics.csv', index=False)
-
-
-
-
