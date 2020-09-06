@@ -54,15 +54,20 @@ if __name__ == '__main__':
         for i in range(1, 15):
             df[f'shift_day+{i}'] = df['dayofweek'].shift(i)
             labels.append(f'shift_day+{i}')
-        print(len(labels))
+        #print(len(labels))
         df = df[15:]
         temp = df[df['year'] == 2017]
         df = df[df['year'] < 2017]
+
+
         X = df[labels].values
         y = df['sales'].values
+
         eval_X = temp[labels].values
         eval_y = temp['sales'].values
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+        print(X)
 
         scaler = MinMaxScaler()
         scaler.fit(X_train)
@@ -78,6 +83,9 @@ if __name__ == '__main__':
         model.add(Dense(125, 'relu'))
         model.add(Dense(1))
         model.compile(optimizer='adam', loss='mse')
+
+        print(X_train, y_train)
+        exit(1)
 
         model.fit(x=X_train, y=y_train, epochs=10)
 
@@ -96,4 +104,4 @@ if __name__ == '__main__':
         test_results['Predicted Sales'] = test_predictions
         test_results['dayofweek'] = temp['dayofweek'].values
         test_results['month'] = temp['month'].values
-        test_results.to_csv(f'./test_results/test_item_{item}_results.csv')
+        #test_results.to_csv(f'./test_results/test_item_{item}_results.csv')

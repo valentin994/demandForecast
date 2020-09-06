@@ -19,6 +19,8 @@ from sklearn.linear_model import Ridge
 import statsmodels.api as sm
 from statsmodels.tsa.seasonal import seasonal_decompose
 from statsmodels.tsa.stattools import adfuller
+from pmdarima.arima import ADFTest, auto_arima
+import pmdarima as pm
 
 PATH = './train.csv'
 
@@ -136,43 +138,34 @@ def monthly_sales(sales):
 
 if __name__ == '__main__':
     df = pd.read_csv(PATH)
-    #   Data preparation
-    #
-    #   Filtracija, grupiranje i dodavanje datuma za item trgovackog lanca
-    #
-
     temp = df
     df['date'] = pd.to_datetime(df['date'])
     daily_sale = df.groupby('date')['sales'].sum().to_frame()
     mean_sales = df.groupby('date')['sales'].mean().to_frame()
 
-    for itemNumber in range(1, 2):
+    for itemNumber in range(15, 16):
         df = temp[temp['item'] == itemNumber]
         df = df.groupby('date')['sales'].sum().to_frame().reset_index()
         df['year'] = df.date.dt.year
         df['dayofmonth'] = df.date.dt.day
         df['dayofweek'] = df.date.dt.dayofweek
         df['month'] = df.date.dt.month
-        print(df)
-
-        #   Parametri
 
         for i in range(1, 15):
-           df[f'shift_sales+{i}'] = df['sales'].shift(i)
+            df[f'shift_sales+{i}'] = df['sales'].shift(i)
 
         df['daily_store_sales'] = daily_sale['sales'].tolist()
         for i in range(1, 31):
-           df[f'daily_store_sales{i}'] = df['daily_store_sales'].shift(i)
+            df[f'daily_store_sales{i}'] = df['daily_store_sales'].shift(i)
         df = df.drop('daily_store_sales', axis=1)
 
         df['mean_store_sales'] = mean_sales['sales'].tolist()
         for i in range(1, 31):
-           df[f'mean_store_sales{i}'] = df['mean_store_sales'].shift(i)
+            df[f'mean_store_sales{i}'] = df['mean_store_sales'].shift(i)
         df = df.drop('mean_store_sales', axis=1)
 
         for i in range(1, 31):
-           df[f'shift_day+{i}'] = df['dayofweek'].shift(i)
-
+            df[f'shift_day+{i}'] = df['dayofweek'].shift(i)
         df['week_sale'] = week_sale(df['sales'].tolist())
         df['week_avg'] = week_avg(df['sales'].tolist())
         df['monthly_sales'] = monthly_sales(df['sales'].tolist())
@@ -180,84 +173,40 @@ if __name__ == '__main__':
         df['three_day_sale_avg'] = three_day_avg(df['sales'].tolist())
         df['four_day_sale_avg'] = four_day_avg(df['sales'].tolist())
         for i in range(1, 8):
-           df[f'three_day_sale_avg_shift{i}'] = df['three_day_sale_avg'].shift(i)
-           df[f'four_day_sale_avg_shift{i}'] = df['four_day_sale_avg'].shift(i)
-           df[f'two_day_sale_avg_shift{i}'] = df['two_day_sale_avg'].shift(i)
-           df[f'week_sale{i}'] = df['week_sale'].shift(i)
-           df[f'week_avg{i}'] = df['week_avg'].shift(i)
-           df[f'monthly_sales{i}'] = df['monthly_sales'].shift(i)
+            df[f'three_day_sale_avg_shift{i}'] = df['three_day_sale_avg'].shift(i)
+            df[f'four_day_sale_avg_shift{i}'] = df['four_day_sale_avg'].shift(i)
+            df[f'two_day_sale_avg_shift{i}'] = df['two_day_sale_avg'].shift(i)
+            df[f'week_sale{i}'] = df['week_sale'].shift(i)
+            df[f'week_avg{i}'] = df['week_avg'].shift(i)
+            df[f'monthly_sales{i}'] = df['monthly_sales'].shift(i)
 
-        tes = df[df['year'] > 2016]
-        tra = df[(df['year'] < 2017)].drop('year', axis=1).dropna()
-        tra = tra.set_index('date')
-        tes = tes.set_index('date')
-        df = df.drop('year', axis=1)
+        df = df.set_index('date')
+        df_train = df[(df['year'] < 2017)]
+        df_train = df_train[30:]
+        df_test = df[df['year'] > 2016]
+        df_test = df_test[df_test['month'] < 7]
 
-        #Time Series Decomposition
-        fig = seasonal_decompose(tra['sales'], model='additive', freq=365).plot()
-        #fig.show()
+        sarima_results = df_test.reset_index()
+        sarima_results['sales'] = 0
 
-        #Dickey-Fuller test, test stacionarity
-        dftest = adfuller(tra['sales'], autolag='AIC')
-        dfoutput = pd.Series(dftest[0:4],
-                             index=['Test Statistic', 'p-value', '#Lags Used', 'Number of Observations Used'])
-        for key, value in dftest[4].items():
-            dfoutput['Critical Value (%s)' % key] = value
-        print(dfoutput)
+        s1i1 = df_train.copy()
 
-        #Apply a seasonal difference
-        diff_7 = tra['sales'].diff(7)
-        diff_7.dropna(inplace=True)
-        fig = seasonal_decompose(diff_7, model='additive', freq=365).plot()
-        fig.show()
+        #arima_params = pm.auto_arima(df_train['sales'], start_p=1, start_q=1, max_p=3, max_q=3, m=7,
+        #                             start_P=0, seasonal=True, d=1, D=1, trace=True,
+        #                             suppress_warnings=True, stepwise=True)
+        #arima_params.summary()
 
-        dftest = adfuller(diff_7, autolag='AIC')
-        dfoutput = pd.Series(dftest[0:4],
-                             index=['Test Statistic', 'p-value', '#Lags Used', 'Number of Observations Used'])
-        for key, value in dftest[4].items():
-            dfoutput['Critical Value (%s)' % key] = value
-        print(dfoutput)
+        sarima = sm.tsa.statespace.SARIMAX(s1i1['sales'], exog=s1i1.drop('sales', axis=1), trend='n', freq='D',
+                                           enforce_invertibility=False,
+                                           order=(3, 1, 1), seasonal_order=(2,1,0,12))
+        results = sarima.fit(maxiter=200)
 
-        #Take first differences
-        diff_1_7 = diff_7.diff(1)
-        diff_1_7.dropna(inplace=True)
-        fig = seasonal_decompose(diff_1_7, model='additive', freq=365).plot()
-        fig.show()
+        fcst = results.predict(start='2017-01-01', end='2017-12-31', exog=df_test.drop('sales', axis=1))
+        # fcst = results.predict(start='2017-01-01', end='2017-12-31', dynamic=True)
+        fcst = abs(fcst)
+        print(fcst, df_test['sales'])
 
-        dftest_1 = adfuller(diff_1_7, autolag='AIC')
-        dfoutput_1 = pd.Series(dftest_1[0:4],
-                             index=['Test Statistic', 'p-value', '#Lags Used', 'Number of Observations Used'])
-        for key, value in dftest_1[4].items():
-            dfoutput_1['Critical Value (%s)' % key] = value
-        print(dfoutput_1)
-
-        #Plot ACF and PACF
-        fig, ax = plt.subplots(2)
-        ax[0] = sm.graphics.tsa.plot_acf(diff_1_7, lags=50, ax=ax[0])
-        ax[1] = sm.graphics.tsa.plot_pacf(diff_1_7, lags=50, ax=ax[1])
-        fig.show()
-
-        #Build model
-        sarima = sm.tsa.statespace.SARIMAX(tra['sales'], trend='n', freq='D', enforce_invertibility=False,
-                                           order=(6, 1, 1), seasonal_order=(1, 1, 1, 7))
-        results = sarima.fit()
-        print(results.summary())
-
-        tra['fcst'] = results.predict(start='2017-10-01', end='2017-12-31', dynamic=True)
-        fig = tra[['sales', 'fcst']].loc['2017-10-01':].plot()
-        fig.show()
-
-        #   Model
-
-
-
-
-
-
-
-        #   Evaluation
-
-        # print(f'Model fit results:\n'
-        #      f'r2_score {r2_score(y_test, predictions)} \t MSE {mean_squared_error(y_test, predictions)}'
-        #      f'\tEVS {explained_variance_score(y_test, predictions)} \n MAE {mean_absolute_error(y_test, predictions)}'
-        #      f'\tMAD {median_absolute_error(y_test, predictions)}\t ME {max_error(y_test, predictions)}')
+        print(f'Model fit results:\n'
+              f'r2_score {r2_score(df_test["sales"], abs(fcst))} \t MSE {mean_squared_error(df_test["sales"], abs(fcst))}'
+              f'\tEVS {explained_variance_score(df_test["sales"], abs(fcst))} \n MAE {mean_absolute_error(df_test["sales"], abs(fcst))}'
+              f'\tMAD {median_absolute_error(df_test["sales"], abs(fcst))}\t ME {max_error(df_test["sales"], abs(fcst))}')

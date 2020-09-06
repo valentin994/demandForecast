@@ -5,9 +5,6 @@ from matplotlib import pyplot as plt
 from sklearn import svm
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
-from statsmodels.tsa.stattools import adfuller
-from numpy import log
-from statsmodels.tsa.statespace.sarimax import SARIMAX
 from sklearn.linear_model import LinearRegression as LinReg
 from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import GridSearchCV
@@ -17,6 +14,9 @@ from sklearn.metrics import r2_score, mean_squared_error, \
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.preprocessing import StandardScaler
 import time
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.linear_model import Ridge
+import statsmodels.api as sm
 
 PATH = './train.csv'
 
@@ -138,77 +138,84 @@ if __name__ == '__main__':
     #
     #   Filtracija, grupiranje i dodavanje datuma za item trgovackog lanca
     #
-    executionTime = []
-    r = []
-    evs = []
-    df['date'] = pd.to_datetime(df['date'])
+
     temp = df
+    df['date'] = pd.to_datetime(df['date'])
     daily_sale = df.groupby('date')['sales'].sum().to_frame()
-    for timeWindow in range(1, 30):
-        df = temp[temp['item'] == 15]
+    mean_sales = df.groupby('date')['sales'].mean().to_frame()
+
+    for itemNumber in range(15, 16):
+        df = temp[temp['item'] == itemNumber]
         df = df.groupby('date')['sales'].sum().to_frame().reset_index()
         df['year'] = df.date.dt.year
         df['dayofmonth'] = df.date.dt.day
         df['dayofweek'] = df.date.dt.dayofweek
         df['month'] = df.date.dt.month
-        df = df.drop('date', axis=1)
 
         #   Parametri
 
-        for i in range(1, timeWindow):
-            df[f'shift_sales+{i}'] = df['sales'].shift(i)
+        for i in range(1, 15):
+           df[f'shift_sales+{i}'] = df['sales'].shift(i)
 
         df['daily_store_sales'] = daily_sale['sales'].tolist()
-        for i in range(1, timeWindow):
-            df[f'daily_store_sales{i}'] = df['daily_store_sales'].shift(i)
+        for i in range(1, 31):
+           df[f'daily_store_sales{i}'] = df['daily_store_sales'].shift(i)
         df = df.drop('daily_store_sales', axis=1)
 
-        for i in range(1, timeWindow):
-            df[f'shift_day+{i}'] = df['dayofweek'].shift(i)
+        df['mean_store_sales'] = mean_sales['sales'].tolist()
+        for i in range(1, 31):
+           df[f'mean_store_sales{i}'] = df['mean_store_sales'].shift(i)
+        df = df.drop('mean_store_sales', axis=1)
 
-    test = df[df['year'] > 2016]
-    df = df[(df['year'] < 2017)]
-    df = df.iloc[timeWindow:]
-    df = df.drop('year', axis=1)
-    test = test.drop('year', axis=1)
+        for i in range(1, 31):
+           df[f'shift_day+{i}'] = df['dayofweek'].shift(i)
 
-    #   Model
-    X = df.drop('sales', axis=1)
-    y = df['sales']
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-    #SARIMAX MODEL
-    print(df)
-    result = adfuller(df['sales'].tolist())
-    print('ADF Stat: %f' % result[0])
-    print('p-val: %f' % result[1])
+        df['week_sale'] = week_sale(df['sales'].tolist())
+        df['week_avg'] = week_avg(df['sales'].tolist())
+        df['monthly_sales'] = monthly_sales(df['sales'].tolist())
+        df['two_day_sale_avg'] = two_day_avg(df['sales'].tolist())
+        df['three_day_sale_avg'] = three_day_avg(df['sales'].tolist())
+        df['four_day_sale_avg'] = four_day_avg(df['sales'].tolist())
+        for i in range(1, 8):
+           df[f'three_day_sale_avg_shift{i}'] = df['three_day_sale_avg'].shift(i)
+           df[f'four_day_sale_avg_shift{i}'] = df['four_day_sale_avg'].shift(i)
+           df[f'two_day_sale_avg_shift{i}'] = df['two_day_sale_avg'].shift(i)
+           df[f'week_sale{i}'] = df['week_sale'].shift(i)
+           df[f'week_avg{i}'] = df['week_avg'].shift(i)
+           df[f'monthly_sales{i}'] = df['monthly_sales'].shift(i)
+
+        tes = df[df['year'] > 2016]
+        tra = df[(df['year'] < 2017)].drop('year', axis=1)
+        tra = tra[30:]
+        tra = tra.set_index('date')
+        tes = tes.set_index('date')
+        df = df.drop('year', axis=1)
+        #   Model
+        exog_train = tra.drop('sales', axis=1)
+        tra = tra['sales']
+        print(tra)
+        print(exog_train)
+
+        #resDiff = sm.tsa.arma_order_select_ic(tra, max_ar=7, max_ma=7, ic='aic', trend='c')
+        #print('ARMA(p,q) =', resDiff['aic_min_order'], 'is the best.')
+
+        #sarimax = sm.tsa.statespace.SARIMAX(tra, order=(6, 1, 1), seasonal_order=(1,1,1,7),
+        #                                    enforce_stationarity=False, enforce_invertibility=False, freq='D').fit()
+
+        sarima = sm.tsa.statespace.SARIMAX(tra, trend='n', freq='D', enforce_invertibility=False,
+                                           order=(6, 1, 1), seasonal_order=(1, 1, 1, 7))
+
+        results = sarima.fit()
+        print(results.summary())
+        #res = sarimax.resid
+
+        pred = results.predict('2017-01-01', '2017-12-31', dynamic=True)
+        print('ARIMA model MSE:{}'.format(explained_variance_score(tes['sales'], pred)))
 
 
+        #   Evaluation
 
-
-        #   SVR MODEL
-        #svr = svm.SVR(C=0.001, kernel='linear', degree=8, gamma='scale', coef0=10, verbose=3)
-        #svr.fit(X_train, y_train)
-        #
-        #predictions = svr.predict(X_test)
-        #predictions = svr.predict(test.drop('sales', axis=1))
-
-        #   LINEAR REGRESSION
-        #start = time.time()
-        #lin_reg = LinearRegression()
-        #lin_reg.fit(X_train, y_train)
-        #predictions = lin_reg.predict(test.drop('sales', axis=1))
-        #end = time.time()
-        #y_test = test['sales'].tolist()
-        #r.append(r2_score(y_test, predictions))
-        #evs.append((explained_variance_score(y_test, predictions)))
-        #executionTime.append(end-start)
-    #results = pd.DataFrame()
-    #results['time'] = executionTime
-    #results['r2_score'] = r
-    #results['evs'] = evs
-    #print(results)
-    #results.to_csv('./plots_linear/time_metrics/r2_time_metrics.csv', index=False)
-
-
-
-
+        # print(f'Model fit results:\n'
+        #      f'r2_score {r2_score(y_test, predictions)} \t MSE {mean_squared_error(y_test, predictions)}'
+        #      f'\tEVS {explained_variance_score(y_test, predictions)} \n MAE {mean_absolute_error(y_test, predictions)}'
+        #      f'\tMAD {median_absolute_error(y_test, predictions)}\t ME {max_error(y_test, predictions)}')

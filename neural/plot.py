@@ -39,49 +39,49 @@ if __name__ == '__main__':
         me.append(max_error(true_values, predicted_values))
 
         #   Predvidanja plotana uz prave vrijednosti
-        plt.figure(figsize=(15, 4))
-        sns.lineplot(x=df.index, y='Predicted Sales', data=df, label='Predictions')
-        sns.lineplot(x=df.index, y='True Sales', data=df, label='Sales')
-        plt.legend(loc=2)
-        plt.savefig(f'./plots_neural/item{i}/value_comparison.png')
-        plt.clf()
+      #  plt.figure(figsize=(15, 4))
+      #  sns.lineplot(x=df.index, y='Predicted Sales', data=df, label='Predictions')
+      #  sns.lineplot(x=df.index, y='True Sales', data=df, label='Sales')
+      #  plt.legend(loc=2)
+      #  plt.savefig(f'./plots_neural/item{i}/value_comparison.png')
+      #  plt.clf()
 
         #   Raspodjela prodaje po tjednu i vrijednosti
-        sns.jointplot(x='dayofweek', y='True Sales', data=df)
-        plt.savefig(f'./plots_neural/item{i}/value_weekly_sales_spread_points.png')
-        plt.clf()
-
-        #   Tjedna usporedba
-        sns.lineplot(x='dayofweek', y='True Sales', data=df, label='sales')
-        sns.lineplot(x='dayofweek', y='Predicted Sales', data=df, label='predictions')
-        plt.legend(loc=2)
-        plt.savefig(f'./plots_neural/item{i}/weekly_comparison.png')
-        plt.clf()
-
-        #   Error
-        sns.distplot(df['Predicted Sales'] - df['True Sales'])
-        sns.kdeplot(df['Predicted Sales'] - df['True Sales'], shade=True, shade_lowest=False)
-        plt.savefig(f'./plots_neural/item{i}/error_swarm.png')
-        plt.clf()
+       # sns.jointplot(x='dayofweek', y='True Sales', data=df)
+       # plt.savefig(f'./plots_neural/item{i}/value_weekly_sales_spread_points.png')
+       # plt.clf()
+#
+       # #   Tjedna usporedba
+       # sns.lineplot(x='dayofweek', y='True Sales', data=df, label='sales')
+        #sns.lineplot(x='dayofweek', y='Predicted Sales', data=df, label='predictions')
+        #plt.legend(loc=2)
+        #plt.savefig(f'./plots_neural/item{i}/weekly_comparison.png')
+ #       plt.clf()
+#
+        ##   Error
+       # sns.distplot(df['Predicted Sales'] - df['True Sales'])
+       # sns.kdeplot(df['Predicted Sales'] - df['True Sales'], shade=True, shade_lowest=False)
+       # plt.savefig(f'./plots_neural/item{i}/error_swarm.png')
+       # plt.clf()
 
         #   Error u postocima
-        sns.lineplot(x=np.arange(1, 366), y=df['True Sales'] / df['Predicted Sales'], label='error')
+        sns.lineplot(x=np.arange(1,366), y=abs(df['True Sales'] - df['Predicted Sales'])/df['True Sales']*100, label='error')
         plt.savefig(f'./plots_neural/item{i}/error_percentage.png')
         plt.clf()
 
         #   Mjesecno ponasanje
-        sns.barplot(x='month', y='True Sales', data=df, label='Monthly Sales')
-        plt.savefig(f'./plots_neural/item{i}/monthly_sales.png')
-        plt.clf()
+       # sns.barplot(x='month', y='True Sales', data=df, label='Monthly Sales')
+       # plt.savefig(f'./plots_neural/item{i}/monthly_sales.png')
+       # plt.clf()
 
         #   Usporedba svih mjeseci
-        for j in range(1, 13):
-            sns.lineplot(y='True Sales', x=np.arange(len(df[df['month'] == j])), data=df[df['month'] == j],
-                         label='Sales')
-            sns.lineplot(y='Predicted Sales', x=np.arange(len(df[df['month'] == j])), data=df[df['month'] == j],
-                         label='Predictions')
-            plt.savefig(f'./plots_neural/item{i}/mothly_comparison/monthly_sales_{j}.png')
-            plt.clf()
+        #for j in range(1, 13):
+        #    sns.lineplot(y='True Sales', x=np.arange(len(df[df['month'] == j])), data=df[df['month'] == j],
+        #                 label='Sales')
+        #    sns.lineplot(y='Predicted Sales', x=np.arange(len(df[df['month'] == j])), data=df[df['month'] == j],
+        #                 label='Predictions')
+        #    plt.savefig(f'./plots_neural/item{i}/mothly_comparison/monthly_sales_{j}.png')
+        #    plt.clf()
 
     plot(r2, 'r2')
     plot(mse, 'mse')

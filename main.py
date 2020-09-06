@@ -14,6 +14,9 @@ from sklearn.metrics import r2_score, mean_squared_error, \
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.preprocessing import StandardScaler
 import time
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.linear_model import Ridge
+
 
 PATH = './train.csv'
 
@@ -139,8 +142,7 @@ if __name__ == '__main__':
     daily_sale = df.groupby('date')['sales'].sum().to_frame()
     mean_sales = df.groupby('date')['sales'].mean().to_frame()
 
-
-    for itemNumber in range(14, 15):
+    for itemNumber in range(1, 51):
         df = temp[temp['item'] == itemNumber]
         df = df.groupby('date')['sales'].sum().to_frame().reset_index()
         df['year'] = df.date.dt.year
@@ -148,6 +150,7 @@ if __name__ == '__main__':
         df['dayofweek'] = df.date.dt.dayofweek
         df['month'] = df.date.dt.month
         df = df.drop('date', axis=1)
+
 
         #   Parametri
 
@@ -185,7 +188,6 @@ if __name__ == '__main__':
         df = df.iloc[30:]
         df = df.drop('year', axis=1)
         test = test.drop('year', axis=1)
-        print(df.columns)
 
         #   Model
 
@@ -193,18 +195,30 @@ if __name__ == '__main__':
         y = df['sales']
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-        #   SVR MODEL
-        svr = svm.SVR(C=0.001, kernel='linear', degree=8, gamma='scale', coef0=10, verbose=3)
-        svr.fit(X_train, y_train)
-        predictions = svr.predict(X_test)
-        predictions = svr.predict(test.drop('sales', axis=1))
+        #   Random Forest Regression
+        rfr = RandomForestRegressor()
+        rfr.fit(X_train, y_train)
+        predictions = rfr.predict(X_test)
+        predictions = rfr.predict(test.drop('sales', axis=1))
         y_test = test['sales'].tolist()
+
+        #   SVR MODEL
+        #svr = svm.SVR(C=0.001, kernel='linear', degree=8, gamma='scale', coef0=10)
+        #svr.fit(X_train, y_train)
+        #predictions = svr.predict(X_test)
+        #predictions = svr.predict(test.drop('sales', axis=1))
+        #y_test = test['sales'].tolist()
 
         #   LINEAR REGRESSION
 
         #lin_reg = LinearRegression()
         #lin_reg.fit(X_train, y_train)
         #predictions = lin_reg.predict(test.drop('sales', axis=1))
+        #y_test = test['sales'].tolist()
+
+        #ridge = Ridge()
+        #ridge.fit(X_train, y_train)
+        #predictions = ridge.predict(test.drop('sales', axis=1))
         #y_test = test['sales'].tolist()
 
         results = pd.DataFrame()
@@ -214,7 +228,7 @@ if __name__ == '__main__':
         results['dayofweek'] = test['dayofweek'].tolist()
         results['month'] = test['month'].tolist()
 
-        #results.to_csv(f'./rjesenja_linear/results_{itemNumber}.csv', index=False)
+        #results.to_csv(f'./rjesenja_rf/results_{itemNumber}.csv', index=False)
 
 
         #   Evaluation
